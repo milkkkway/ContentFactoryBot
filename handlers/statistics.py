@@ -6,7 +6,7 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 import api.YouTubeApi as YouTubeApi
-from utilities.states import StatsStates
+from utilities.states import StatsStates  # Используем обновленные состояния
 from utilities.keyboards import (
     create_region_keyboard,
     create_channel_navigation_keyboard
@@ -422,6 +422,14 @@ async def show_prev_video(callback: CallbackQuery):
 
     await callback.answer()
 
+async def trend_search(message: Message):
+    """Обработчик для трендов"""
+    await message.answer(
+        "📈 <b>Функционал трендов в разработке</b>\n\n"
+        "Скоро здесь появится анализ трендов!",
+        parse_mode='HTML'
+    )
+
 async def back_to_channels(callback: CallbackQuery, state: FSMContext):
     """Возвращает к списку каналов"""
     user_id = callback.from_user.id
@@ -442,7 +450,8 @@ async def back_to_channels(callback: CallbackQuery, state: FSMContext):
 def register_statistics_handlers(dp: Dispatcher):
     """Регистрирует все обработчики статистики"""
     # Обработчики статистики
-    dp.message.register(start_statistics, F.text == "📊 СТАТИСТИКА")
+    dp.message.register(start_statistics, F.text == "📊 СТАТИСТИКА ПО ПАРАМЕТРАМ")
+    dp.message.register(trend_search, F.text == "ТРЕНДЫ")
     dp.message.register(process_keyword, StatsStates.waiting_keyword)
     dp.message.register(process_num_posts, StatsStates.waiting_num_posts)
     dp.message.register(process_min_subs, StatsStates.waiting_min_subs)

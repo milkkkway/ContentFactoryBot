@@ -1,194 +1,218 @@
-import psycopg2
-from psycopg2 import sql
+import logging
+from db.database_manager import DatabaseManager
+
+logger = logging.getLogger(__name__)
+
 
 class UserManager:
-    def __init__(self, dbname="postgres", user="postgres", password="2323420",
-                 host="localhost", port="5432"):
-        self.connection_params = {
-            'dbname': dbname,
-            'user': user,
-            'password': password,
-            'host': host,
-            'port': port
-        }
-        self.conn = None
-        self.cursor = None
+    def __init__(self):
+        self.db = DatabaseManager()
+        self.current_user_id = None
 
     def connect(self):
-        try:
-            self.conn = psycopg2.connect(**self.connection_params)
-            self.cursor = self.conn.cursor()
-            print("Успешное подключение к базе данных")
-            self._create_users_table()
-            return True
+        """Подключение к базе данных"""
+        return self.db.connect()
 
-        except psycopg2.OperationalError as e:
-            print(f"❌ Ошибка подключения к базе данных: {e}")
-            print("Проверьте:")
-            print("1. Запущен ли сервер PostgreSQL")
-            print("2. Правильность пароля")
-            print("3. Доступность хоста и порта")
-            return False
-        except psycopg2.Error as e:
-            print(f"❌ Ошибка PostgreSQL: {e}")
-            return False
-
-    def _create_users_table(self):
-        create_table_query = """
-        CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY,
-            username VARCHAR(50) UNIQUE NOT NULL,
-            psswrd VARCHAR(100) UNIQUE NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-        """
-        try:
-            self.cursor.execute(create_table_query)
-            self.conn.commit()
-            print("✅ Таблица users готова к работе")
-        except psycopg2.Error as e:
-            print(f"❌ Ошибка создания таблицы: {e}")
-
-    def _check_connection(self):
-        if self.conn is None or self.cursor is None:
-            print("❌ Нет активного соединения с базой данных")
-            return False
-        return True
-
-    def check_user_exists(self, username=None, psswrd=None):
-        if not self._check_connection():
-            return False
-
-        if not username and not psswrd:
-            print("❌ Укажите username или psswrd для поиска")
+    def check_user_exists(self, username=None, psswrd=None, telegram_id=None):
+        """Проверка существования пользователя"""
+        if not self.db.connect():
             return False
 
         try:
             if username and psswrd:
-                # Проверка по логину И паролю
-                query = "SELECT * FROM users WHERE username = %s AND psswrd = %s"
-                self.cursor.execute(query, (username, psswrd))
+                # Проверка по логину и паролю (для обычной авторизации)
+                query = "SELECT id, role FROM users WHERE username = %s AND psswrd = %s"
+                user = self.db.fetch_one(query, (username, psswrd))
+            elif telegram_id:
+                # Проверка по Telegram ID (для бота)
+                query = "SELECT id, role FROM users WHERE telegram_id = %s"
+                user = self.db.fetch_one(query, (telegram_id,))
             elif username:
-                query = "SELECT * FROM users WHERE username = %s"
-                self.cursor.execute(query, (username,))
+                # Проверка только по username
+                query = "SELECT id, role FROM users WHERE username = %s"
+                user = self.db.fetch_one(query, (username,))
             else:
-                query = "SELECT * FROM users WHERE psswrd = %s"
-                self.cursor.execute(query, (psswrd,))
-
-            user = self.cursor.fetchone()
-
-            if user:
-                print(f"✅ Пользователь найден: ID={user[0]}, Username={user[1]}, psswrd={user[2]}")
-                return True
-            else:
-                print("❌ Пользователь не найден")
+                logger.error("❌ Не указаны параметры для поиска пользователя")
                 return False
 
-        except psycopg2.Error as e:
-            print(f"❌ Ошибка при проверке пользователя: {e}")
+            if user:
+                user_id, role = user
+                self.current_user_id = user_id
+                logger.info(f"✅ Пользователь найден: ID={user_id}, Role={role}")
+                return True
+            else:
+                logger.info("❌ Пользователь не найден")
+                return False
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка при проверке пользователя: {e}")
             return False
 
-    def create_user(self, username, psswrd):
-        """
-        Создание нового пользователя
-        """
-        if not self._check_connection():
-            return False
+    def get_user_by_username(self, username):
+        """Получение пользователя по username"""
+        if not self.db.connect():
+            return None
 
-        # Сначала проверяем, нет ли уже такого пользователя
-        if self.check_user_exists(username=username) or self.check_user_exists(psswrd=psswrd):
-            print("❌ Пользователь с таким username или psswrd уже существует")
+        try:
+            query = "SELECT id, username, role, telegram_id FROM users WHERE username = %s"
+            result = self.db.fetch_one(query, (username,))
+            if result:
+                user_data = {
+                    'id': result[0],
+                    'username': result[1],
+                    'role': result[2],
+                    'telegram_id': result[3]
+                }
+                logger.info(f"✅ Найден пользователь по username {username}: {user_data}")
+                return user_data
+            return None
+        except Exception as e:
+            logger.error(f"❌ Ошибка при получении пользователя по username: {e}")
+            return None
+
+    def update_user_telegram_id(self, username, telegram_id):
+        """Обновление telegram_id для существующего пользователя"""
+        if not self.db.connect():
             return False
 
         try:
-            insert_query = """
-            INSERT INTO users (username, psswrd) 
-            VALUES (%s, %s) 
-            RETURNING id
-            """
-            self.cursor.execute(insert_query, (username, psswrd))
-            user_id = self.cursor.fetchone()[0]
-            self.conn.commit()
+            query = "UPDATE users SET telegram_id = %s WHERE username = %s"
+            result = self.db.execute_query(query, (telegram_id, username))
 
-            print(f"✅ Пользователь создан успешно! ID: {user_id}")
-            return True
-
-        except psycopg2.Error as e:
-            self.conn.rollback()
-            print(f"❌ Ошибка при создании пользователя: {e}")
+            if result:
+                logger.info(f"✅ Telegram ID {telegram_id} обновлен для пользователя {username}")
+                return True
             return False
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка при обновлении telegram_id: {e}")
+            return False
+
+    def update_user_telegram_id(self, username, telegram_id):
+        """Обновление telegram_id для существующего пользователя"""
+        if not self.db.connect():
+            return False
+
+        try:
+            query = "UPDATE users SET telegram_id = %s WHERE username = %s"
+            result = self.db.execute_query(query, (telegram_id, username))
+
+            if result:
+                logger.info(f"✅ Telegram ID {telegram_id} обновлен для пользователя {username}")
+                return True
+            return False
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка при обновлении telegram_id: {e}")
+            return False
+
+    def create_user(self, username, psswrd, telegram_id=None, role='user'):
+        """Создание нового пользователя"""
+        if not self.db.connect():
+            return False
+
+        # Проверяем, нет ли уже пользователя с таким username
+        if self.check_user_exists(username=username):
+            logger.error("❌ Пользователь с таким username уже существует")
+            return False
+
+        # Если указан telegram_id, проверяем его уникальность
+        if telegram_id and self.check_user_exists(telegram_id=telegram_id):
+            logger.error("❌ Пользователь с таким Telegram ID уже существует")
+            return False
+
+        try:
+            if telegram_id:
+                query = """
+                INSERT INTO users (username, psswrd, telegram_id, role) 
+                VALUES (%s, %s, %s, %s) 
+                RETURNING id
+                """
+                result = self.db.execute_query(query, (username, psswrd, telegram_id, role))
+            else:
+                query = """
+                INSERT INTO users (username, psswrd, role) 
+                VALUES (%s, %s, %s) 
+                RETURNING id
+                """
+                result = self.db.execute_query(query, (username, psswrd, role))
+
+            if result:
+                logger.info(
+                    f"✅ Пользователь создан успешно! Username: {username}, Role: {role}, Telegram ID: {telegram_id}")
+                return True
+            return False
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка при создании пользователя: {e}")
+            return False
+
+    def get_current_user_id(self):
+        """Получение ID текущего пользователя"""
+        return self.current_user_id
+
+    def get_user_role(self, user_id=None):
+        """Получение роли пользователя"""
+        if not self.db.connect():
+            return None
+
+        try:
+            query = "SELECT role FROM users WHERE id = %s"
+            result = self.db.fetch_one(query, (user_id or self.current_user_id,))
+            return result[0] if result else None
+        except Exception as e:
+            logger.error(f"❌ Ошибка при получении роли пользователя: {e}")
+            return None
+
+    def get_user_by_telegram_id(self, telegram_id):
+        """Получение пользователя по Telegram ID"""
+        if not self.db.connect():
+            return None
+
+        try:
+            query = "SELECT id, username, role FROM users WHERE telegram_id = %s"
+            result = self.db.fetch_one(query, (telegram_id,))
+            if result:
+                user_data = {
+                    'id': result[0],
+                    'username': result[1],
+                    'role': result[2]
+                }
+                logger.info(f"✅ Найден пользователь по Telegram ID {telegram_id}: {user_data}")
+                return user_data
+            logger.warning(f"⚠️ Пользователь с Telegram ID {telegram_id} не найден")
+            return None
+        except Exception as e:
+            logger.error(f"❌ Ошибка при получении пользователя: {e}")
+            return None
 
     def get_all_users(self):
         """Получение списка всех пользователей"""
-        if not self._check_connection():
+        if not self.db.connect():
             return []
 
         try:
-            self.cursor.execute("SELECT * FROM users ORDER BY id")
-            users = self.cursor.fetchall()
+            query = "SELECT id, username, role, telegram_id, created_at FROM users ORDER BY id"
+            users = self.db.fetch_all(query)
 
             if users:
-                print("\n📋 Список всех пользователей:")
+                logger.info("📋 Получен список всех пользователей")
+                formatted_users = []
                 for user in users:
-                    print(f"ID: {user[0]}, Username: {user[1]}, psswrd: {user[2]}, Created: {user[3]}")
-            else:
-                print("📭 В базе данных нет пользователей")
+                    formatted_users.append({
+                        'id': user[0],
+                        'username': user[1],
+                        'role': user[2],
+                        'telegram_id': user[3],
+                        'created_at': user[4]
+                    })
+                return formatted_users
+            return []
 
-            return users
-
-        except psycopg2.Error as e:
-            print(f"❌ Ошибка при получении списка пользователей: {e}")
+        except Exception as e:
+            logger.error(f"❌ Ошибка при получении списка пользователей: {e}")
             return []
 
     def close_connection(self):
         """Закрытие соединения с базой данных"""
-        if self.cursor:
-            self.cursor.close()
-        if self.conn:
-            self.conn.close()
-        print("🔌 Соединение с базой данных закрыто")
-
-def main():
-    print("🚀 Запуск менеджера пользователей PostgreSQL")
-
-    user_manager = UserManager(
-        dbname="postgres",
-        user="postgres",
-        password="2323420",
-        host="localhost",
-        port="5432"
-    )
-
-    # Устанавливаем соединение
-    if not user_manager.connect():
-        return
-
-    # 1. Создаем нового пользователя
-    print("\n1. Создание нового пользователя:")
-    user_manager.create_user("ivan_petrov", "ivan@example.com")
-
-    # 2. Проверяем существование пользователя
-    print("\n2. Проверка пользователя:")
-    user_manager.check_user_exists(username="ivan_petrov")
-
-    # 3. Пытаемся создать пользователя с существующим psswrd
-    print("\n3. Попытка создать дубликат:")
-    user_manager.create_user("another_user", "ivan@example.com")
-
-    # 4. Создаем еще одного пользователя
-    print("\n4. Создание второго пользователя:")
-    user_manager.create_user("maria_sidorova", "maria@example.com")
-
-    # 5. Получаем всех пользователей
-    print("\n5. Полный список пользователей:")
-    user_manager.get_all_users()
-
-    # 6. Проверяем несуществующего пользователя
-    print("\n6. Проверка несуществующего пользователя:")
-    user_manager.check_user_exists(username="nonexistent_user")
-
-    # Закрываем соединение
-    user_manager.close_connection()
-
-if __name__ == "__main__":
-    main()
+        self.db.close_connection()
