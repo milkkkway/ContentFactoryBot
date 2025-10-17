@@ -3,17 +3,14 @@ from db.database_manager import DatabaseManager
 
 logger = logging.getLogger(__name__)
 
-
 class DraftManager:
     def __init__(self):
         self.db = DatabaseManager()
 
     def connect(self):
-        """Подключение к базе данных"""
         return self.db.connect()
 
     def create_draft(self, user_id, username, title, description, media_type, media_file_id):
-        """Создание нового черновика - альтернативная версия"""
         logger.info(f"🔄 Попытка создания черновика для user_id: {user_id}")
 
         if not self.db.connect():
@@ -21,7 +18,6 @@ class DraftManager:
             return None
 
         try:
-            # Сначала выполняем INSERT
             insert_query = """
             INSERT INTO drafts (user_id, username, title, description, media_type, media_file_id) 
             VALUES (%s, %s, %s, %s, %s, %s)
@@ -34,7 +30,6 @@ class DraftManager:
                 logger.error("❌ Не удалось выполнить INSERT")
                 return None
 
-            # Затем получаем ID созданного черновика
             select_query = """
             SELECT id, created_at FROM drafts 
             WHERE user_id = %s AND title = %s 
@@ -66,7 +61,6 @@ class DraftManager:
             return None
 
     def get_user_drafts(self, user_id):
-        """Получение ВСЕХ черновиков пользователя по Telegram ID"""
         logger.info(f"🔄 Получение черновиков для user_id: {user_id}")
 
         if not self.db.connect():
@@ -106,7 +100,6 @@ class DraftManager:
             return []
 
     def get_draft_by_id(self, draft_id, user_id):
-        """Получение конкретного черновика по ID и Telegram ID пользователя"""
         logger.info(f"🔄 Получение черновика {draft_id} для user_id: {user_id}")
 
         if not self.db.connect():
@@ -141,7 +134,6 @@ class DraftManager:
             return None
 
     def update_draft(self, draft_id, user_id, title=None, description=None):
-        """Обновление черновика - по Telegram ID"""
         if not self.db.connect():
             return False
 
@@ -177,18 +169,15 @@ class DraftManager:
             return False
 
     def delete_draft(self, draft_id, user_id, user_role='user'):
-        """Удаление черновика - по Telegram ID"""
         if not self.db.connect():
             return False
 
         try:
             if user_role in ['admin', 'moderator']:
-                # Админы могут удалять любые черновики
                 query = "DELETE FROM drafts WHERE id = %s"
                 params = (draft_id,)
                 logger.info(f"🛡️ Админ {user_id} удаляет черновик {draft_id}")
             else:
-                # Обычные пользователи - только свои
                 query = "DELETE FROM drafts WHERE id = %s AND user_id = %s"
                 params = (draft_id, user_id)
                 logger.info(f"✅ Пользователь {user_id} удаляет свой черновик {draft_id}")
@@ -207,5 +196,4 @@ class DraftManager:
             return False
 
     def close_connection(self):
-        """Закрытие соединения с базой данных"""
         self.db.close_connection()

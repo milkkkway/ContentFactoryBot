@@ -3,197 +3,216 @@ from db.database_manager import DatabaseManager
 
 logger = logging.getLogger(__name__)
 
-class DraftManager:
+
+class UserManager:
     def __init__(self):
         self.db = DatabaseManager()
+        self.current_user_id = None
 
     def connect(self):
+        #Подключение к базе данных#
         return self.db.connect()
 
-    def create_draft(self, user_id, username, title, description, media_type, media_file_id):
-        logger.info(f"🔄 Попытка создания черновика для user_id: {user_id}")
-
-        if not self.db.connect():
-            logger.error("❌ Не удалось подключиться к базе данных")
-            return None
-
-        try:
-            insert_query = """
-            INSERT INTO drafts (user_id, username, title, description, media_type, media_file_id) 
-            VALUES (%s, %s, %s, %s, %s, %s)
-            """
-            insert_params = (user_id, username, title, description, media_type, media_file_id)
-
-            insert_result = self.db.execute_query(insert_query, insert_params)
-
-            if not insert_result:
-                logger.error("❌ Не удалось выполнить INSERT")
-                return None
-
-            select_query = """
-            SELECT id, created_at FROM drafts 
-            WHERE user_id = %s AND title = %s 
-            ORDER BY created_at DESC LIMIT 1
-            """
-            select_params = (user_id, title)
-
-            result = self.db.fetch_one(select_query, select_params)
-
-            if result:
-                draft_id, created_at = result
-                logger.info(f"✅ УСПЕХ: Создан черновик {draft_id}")
-                return {
-                    'id': draft_id,
-                    'user_id': user_id,
-                    'username': username,
-                    'title': title,
-                    'description': description,
-                    'media_type': media_type,
-                    'media_file_id': media_file_id,
-                    'created_at': created_at
-                }
-            else:
-                logger.error("❌ Не удалось получить ID созданного черновика")
-                return None
-
-        except Exception as e:
-            logger.error(f"❌ ОШИБКА при создании черновика: {e}")
-            return None
-
-    def get_user_drafts(self, user_id):
-        logger.info(f"🔄 Получение черновиков для user_id: {user_id}")
-
-        if not self.db.connect():
-            logger.error("❌ Не удалось подключиться к базе данных")
-            return []
-
-        try:
-            query = """
-            SELECT id, title, description, media_type, media_file_id, created_at 
-            FROM drafts 
-            WHERE user_id = %s 
-            ORDER BY created_at DESC
-            """
-            drafts = self.db.fetch_all(query, (user_id,))
-
-            logger.info(f"📋 Найдено черновиков: {len(drafts) if drafts else 0}")
-
-            formatted_drafts = []
-            if drafts:
-                for draft in drafts:
-                    formatted_drafts.append({
-                        'id': draft[0],
-                        'title': draft[1],
-                        'description': draft[2],
-                        'media_type': draft[3],
-                        'media_file_id': draft[4],
-                        'created_at': draft[5]
-                    })
-                logger.info(f"✅ УСПЕХ: Форматировано {len(formatted_drafts)} черновиков")
-            else:
-                logger.info("ℹ️ Черновики не найдены")
-
-            return formatted_drafts
-
-        except Exception as e:
-            logger.error(f"❌ ОШИБКА при получении черновиков: {e}")
-            return []
-
-    def get_draft_by_id(self, draft_id, user_id):
-        logger.info(f"🔄 Получение черновика {draft_id} для user_id: {user_id}")
-
-        if not self.db.connect():
-            return None
-
-        try:
-            query = """
-            SELECT id, user_id, username, title, description, media_type, media_file_id, created_at 
-            FROM drafts 
-            WHERE id = %s AND user_id = %s
-            """
-            draft = self.db.fetch_one(query, (draft_id, user_id))
-
-            if draft:
-                logger.info(f"✅ УСПЕХ: Черновик {draft_id} найден")
-                return {
-                    'id': draft[0],
-                    'user_id': draft[1],
-                    'username': draft[2],
-                    'title': draft[3],
-                    'description': draft[4],
-                    'media_type': draft[5],
-                    'media_file_id': draft[6],
-                    'created_at': draft[7]
-                }
-            else:
-                logger.warning(f"⚠️ Черновик {draft_id} не найден для пользователя {user_id}")
-            return None
-
-        except Exception as e:
-            logger.error(f"❌ ОШИБКА при получении черновика: {e}")
-            return None
-
-    def update_draft(self, draft_id, user_id, title=None, description=None):
+    def check_user_exists(self, username=None, psswrd=None, telegram_id=None):
+        #Проверка существования пользователя#
         if not self.db.connect():
             return False
 
         try:
-            update_fields = []
-            params = []
-
-            if title is not None:
-                update_fields.append("title = %s")
-                params.append(title)
-            if description is not None:
-                update_fields.append("description = %s")
-                params.append(description)
-
-            if not update_fields:
+            if username and psswrd:
+                # Проверка по логину и паролю (для обычной авторизации)
+                query = "SELECT id, role FROM users WHERE username = %s AND psswrd = %s"
+                user = self.db.fetch_one(query, (username, psswrd))
+            elif telegram_id:
+                # Проверка по Telegram ID (для бота)
+                query = "SELECT id, role FROM users WHERE telegram_id = %s"
+                user = self.db.fetch_one(query, (telegram_id,))
+            elif username:
+                # Проверка только по username
+                query = "SELECT id, role FROM users WHERE username = %s"
+                user = self.db.fetch_one(query, (username,))
+            else:
+                logger.error("❌ Не указаны параметры для поиска пользователя")
                 return False
 
-            update_fields.append("updated_at = CURRENT_TIMESTAMP")
-            params.extend([draft_id, user_id])
-
-            query = f"UPDATE drafts SET {', '.join(update_fields)} WHERE id = %s AND user_id = %s"
-            result = self.db.execute_query(query, params)
-
-            if result and self.db.cursor.rowcount > 0:
-                logger.info(f"✅ Черновик {draft_id} обновлен пользователем {user_id}")
+            if user:
+                user_id, role = user
+                self.current_user_id = user_id
+                logger.info(f"✅ Пользователь найден: ID={user_id}, Role={role}")
                 return True
             else:
-                logger.warning(f"⚠️ Попытка обновления чужого черновика {draft_id} пользователем {user_id}")
-            return False
+                logger.info("❌ Пользователь не найден")
+                return False
 
         except Exception as e:
-            logger.error(f"❌ Ошибка при обновлении черновика: {e}")
+            logger.error(f"❌ Ошибка при проверке пользователя: {e}")
             return False
 
-    def delete_draft(self, draft_id, user_id, user_role='user'):
+    def get_user_by_username(self, username):
+        #Получение пользователя по username#
+        if not self.db.connect():
+            return None
+
+        try:
+            query = "SELECT id, username, role, telegram_id FROM users WHERE username = %s"
+            result = self.db.fetch_one(query, (username,))
+            if result:
+                user_data = {
+                    'id': result[0],
+                    'username': result[1],
+                    'role': result[2],
+                    'telegram_id': result[3]
+                }
+                logger.info(f"✅ Найден пользователь по username {username}: {user_data}")
+                return user_data
+            return None
+        except Exception as e:
+            logger.error(f"❌ Ошибка при получении пользователя по username: {e}")
+            return None
+
+    def update_user_telegram_id(self, username, telegram_id):
+        #Обновление telegram_id для существующего пользователя#
         if not self.db.connect():
             return False
 
         try:
-            if user_role in ['admin', 'moderator']:
-                query = "DELETE FROM drafts WHERE id = %s"
-                params = (draft_id,)
-                logger.info(f"🛡️ Админ {user_id} удаляет черновик {draft_id}")
-            else:
-                query = "DELETE FROM drafts WHERE id = %s AND user_id = %s"
-                params = (draft_id, user_id)
-                logger.info(f"✅ Пользователь {user_id} удаляет свой черновик {draft_id}")
+            query = "UPDATE users SET telegram_id = %s WHERE username = %s"
+            result = self.db.execute_query(query, (telegram_id, username))
 
-            result = self.db.execute_query(query, params)
-
-            if result and self.db.cursor.rowcount > 0:
-                logger.info(f"✅ Черновик {draft_id} удален пользователем {user_id}")
+            if result:
+                logger.info(f"✅ Telegram ID {telegram_id} обновлен для пользователя {username}")
                 return True
-            else:
-                logger.warning(f"⚠️ Неудачная попытка удаления черновика {draft_id} пользователем {user_id}")
             return False
 
         except Exception as e:
-            logger.error(f"❌ Ошибка при удалении черновика: {e}")
+            logger.error(f"❌ Ошибка при обновлении telegram_id: {e}")
             return False
 
+    def update_user_telegram_id(self, username, telegram_id):
+        #Обновление telegram_id для существующего пользователя#
+        if not self.db.connect():
+            return False
+
+        try:
+            query = "UPDATE users SET telegram_id = %s WHERE username = %s"
+            result = self.db.execute_query(query, (telegram_id, username))
+
+            if result:
+                logger.info(f"✅ Telegram ID {telegram_id} обновлен для пользователя {username}")
+                return True
+            return False
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка при обновлении telegram_id: {e}")
+            return False
+
+    def create_user(self, username, psswrd, telegram_id=None, role='user'):
+        #Создание нового пользователя#
+        if not self.db.connect():
+            return False
+
+        # Проверяем, нет ли уже пользователя с таким username
+        if self.check_user_exists(username=username):
+            logger.error("❌ Пользователь с таким username уже существует")
+            return False
+
+        # Если указан telegram_id, проверяем его уникальность
+        if telegram_id and self.check_user_exists(telegram_id=telegram_id):
+            logger.error("❌ Пользователь с таким Telegram ID уже существует")
+            return False
+
+        try:
+            if telegram_id:
+                query = """
+                INSERT INTO users (username, psswrd, telegram_id, role) 
+                VALUES (%s, %s, %s, %s) 
+                RETURNING id
+                """
+                result = self.db.execute_query(query, (username, psswrd, telegram_id, role))
+            else:
+                query = """
+                INSERT INTO users (username, psswrd, role) 
+                VALUES (%s, %s, %s) 
+                RETURNING id
+                """
+                result = self.db.execute_query(query, (username, psswrd, role))
+
+            if result:
+                logger.info(
+                    f"✅ Пользователь создан успешно! Username: {username}, Role: {role}, Telegram ID: {telegram_id}")
+                return True
+            return False
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка при создании пользователя: {e}")
+            return False
+
+    def get_current_user_id(self):
+        #Получение ID текущего пользователя#
+        return self.current_user_id
+
+    def get_user_role(self, user_id=None):
+        #Получение роли пользователя#
+        if not self.db.connect():
+            return None
+
+        try:
+            query = "SELECT role FROM users WHERE id = %s"
+            result = self.db.fetch_one(query, (user_id or self.current_user_id,))
+            return result[0] if result else None
+        except Exception as e:
+            logger.error(f"❌ Ошибка при получении роли пользователя: {e}")
+            return None
+
+    def get_user_by_telegram_id(self, telegram_id):
+        #Получение пользователя по Telegram ID#
+        if not self.db.connect():
+            return None
+
+        try:
+            query = "SELECT id, username, role FROM users WHERE telegram_id = %s"
+            result = self.db.fetch_one(query, (telegram_id,))
+            if result:
+                user_data = {
+                    'id': result[0],
+                    'username': result[1],
+                    'role': result[2]
+                }
+                logger.info(f"✅ Найден пользователь по Telegram ID {telegram_id}: {user_data}")
+                return user_data
+            logger.warning(f"⚠️ Пользователь с Telegram ID {telegram_id} не найден")
+            return None
+        except Exception as e:
+            logger.error(f"❌ Ошибка при получении пользователя: {e}")
+            return None
+
+    def get_all_users(self):
+        #Получение списка всех пользователей#
+        if not self.db.connect():
+            return []
+
+        try:
+            query = "SELECT id, username, role, telegram_id, created_at FROM users ORDER BY id"
+            users = self.db.fetch_all(query)
+
+            if users:
+                logger.info("📋 Получен список всех пользователей")
+                formatted_users = []
+                for user in users:
+                    formatted_users.append({
+                        'id': user[0],
+                        'username': user[1],
+                        'role': user[2],
+                        'telegram_id': user[3],
+                        'created_at': user[4]
+                    })
+                return formatted_users
+            return []
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка при получении списка пользователей: {e}")
+            return []
+
     def close_connection(self):
+        #Закрытие соединения с базой данных#
         self.db.close_connection()
