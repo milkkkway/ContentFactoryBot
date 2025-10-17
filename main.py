@@ -11,14 +11,11 @@ from handlers.draft import register_draft_handlers
 from utilities.keyboards import create_login_keyboard, create_main_keyboard
 from db.user_manager import UserManager
 
-# Настройка логирования
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Получение токена бота
 BOT_TOKEN = '7379575266:AAFaPpFPuHYPcWrJdd5VHe75Bj0-ZHUrjDI'
-
-# Инициализация бота и диспетчера
 bot = Bot(token=BOT_TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
@@ -27,8 +24,6 @@ dp = Dispatcher(storage=storage)
 @dp.message(Command("start"))
 async def cmd_start(message: Message):
     user_id = message.from_user.id
-
-    # Проверяем, зарегистрирован ли пользователь
     user_manager = UserManager()
     if user_manager.connect():
         try:
@@ -62,20 +57,18 @@ async def cmd_start(message: Message):
         )
 
 
-# Регистрация всех обработчиков в ПРАВИЛЬНОМ порядке
-register_auth_handlers(dp)  # ДОЛЖНО БЫТЬ ПЕРВЫМ!
+register_auth_handlers(dp)
 register_default_handlers(dp)
 register_statistics_handlers(dp)
 register_draft_handlers(dp)
 
 
-# Обработчик по умолчанию
 @dp.message()
 async def handle_other_messages(message: Message):
     if message.text:
         await message.answer(
             "🤖 Используйте кнопки меню или команды:\n"
-            "/start - начать работу\n"
+            "/start - начать работу/перезайти в бота\n"
             "/help - получить справку",
             reply_markup=create_login_keyboard()
         )
@@ -85,6 +78,9 @@ async def main():
     logger.info("Запуск бота...")
     await dp.start_polling(bot)
 
+from handlers.trends import register_trends_handlers
+
+register_trends_handlers(dp)
 
 if __name__ == "__main__":
     import asyncio

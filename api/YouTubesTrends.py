@@ -3,13 +3,10 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from datetime import datetime, timedelta, timezone
 
-# ---SETTINGS---
 API_KEY = "AIzaSyCYg5e4a1MZB1uT2AW6IK27-wplqOfVZOk"
 SERVICE_NAME = 'youtube'
 VERSION = "v3"
 
-
-# --- INIT ---
 def get_youtube_service():
     try:
         return build(SERVICE_NAME, VERSION, developerKey=API_KEY)
@@ -17,33 +14,19 @@ def get_youtube_service():
         print(f"Ошибка инициализации YouTube API: {e}")
         return None
 
-
 def parse_published_at(published_at):
-    """
-    Парсинг даты публикации с учетом часовых поясов
-    """
     try:
-        # Убираем 'Z' и парсим дату
         if published_at.endswith('Z'):
             published_at = published_at[:-1]
-
-        # Парсим дату
         published_date = datetime.fromisoformat(published_at)
-
-        # Если дата без часового пояса, добавляем UTC
         if published_date.tzinfo is None:
             published_date = published_date.replace(tzinfo=timezone.utc)
-
         return published_date
     except Exception as e:
         print(f"Ошибка парсинга даты {published_at}: {e}")
         return datetime.now(timezone.utc)
 
-
 def calculate_virality_score(video_stats, published_at):
-    """
-    Расчет показателя виральности видео
-    """
     views = video_stats.get('views', 0)
     likes = video_stats.get('likes', 0)
     comments = video_stats.get('comments', 0)
@@ -51,17 +34,14 @@ def calculate_virality_score(video_stats, published_at):
     if views == 0:
         return 0
 
-    # Базовые метрики вовлеченности
     like_ratio = likes / views
     comment_ratio = comments / views
 
-    # Учет свежести контента
     published_date = parse_published_at(published_at)
     current_time = datetime.now(timezone.utc)
     days_ago = (current_time - published_date).days
     freshness_bonus = max(0, 1 - (days_ago / 30))
 
-    # Расчет общего показателя виральности
     virality_score = (
             like_ratio * 1000 +
             comment_ratio * 5000 +
@@ -70,11 +50,7 @@ def calculate_virality_score(video_stats, published_at):
 
     return virality_score
 
-
 def get_trending_videos(youtube, region_code, max_results=25):
-    """
-    Получение трендовых видео для региона
-    """
     try:
         request_params = {
             'part': 'snippet,statistics',
@@ -91,13 +67,8 @@ def get_trending_videos(youtube, region_code, max_results=25):
         print(f"Ошибка HTTP {e.resp.status} при запросе трендовых видео: {e.content}")
         return []
 
-
 def search_viral_videos(youtube, region_code, max_results=25, time_period='week'):
-    """
-    Поиск потенциально вирусных видео через поиск с фильтрацией
-    """
     try:
-        # Определяем период для поиска
         now = datetime.now(timezone.utc)
 
         if time_period == 'today':
@@ -111,9 +82,8 @@ def search_viral_videos(youtube, region_code, max_results=25, time_period='week'
 
         published_after_str = published_after.isoformat().replace('+00:00', 'Z')
 
-        # Популярные запросы для поиска вирусного контента
         viral_keywords = [
-            "",  # Пустой запрос для общего тренда
+            "",
             "viral", "тренды", "популярное",
             "shorts", "reels", "вирусное видео",
             "смешное", "удивительное", "шокирующее"
@@ -121,12 +91,12 @@ def search_viral_videos(youtube, region_code, max_results=25, time_period='week'
 
         all_videos = []
 
-        for keyword in viral_keywords[:3]:  # Ограничиваем количество запросов
+        for keyword in viral_keywords[:3]:
             try:
                 search_response = youtube.search().list(
                     part='snippet',
                     type='video',
-                    order='viewCount',  # Сортировка по просмотрам
+                    order='viewCount',
                     regionCode=region_code,
                     publishedAfter=published_after_str,
                     q=keyword,
@@ -136,7 +106,6 @@ def search_viral_videos(youtube, region_code, max_results=25, time_period='week'
                 video_ids = [item['id']['videoId'] for item in search_response.get('items', [])]
 
                 if video_ids:
-                    # Получаем детальную статистику
                     videos_details = youtube.videos().list(
                         id=','.join(video_ids),
                         part='snippet,statistics'
@@ -148,14 +117,12 @@ def search_viral_videos(youtube, region_code, max_results=25, time_period='week'
                 print(f"Ошибка при поиске по ключевому слову '{keyword}': {e}")
                 continue
 
-        # Убираем дубликаты
         unique_videos = {}
         for video in all_videos:
             unique_videos[video['id']] = video
 
         videos_list = list(unique_videos.values())
 
-        # Сортируем по виральности
         scored_videos = []
         for video in videos_list:
             video_stats = {
@@ -174,7 +141,6 @@ def search_viral_videos(youtube, region_code, max_results=25, time_period='week'
                 'virality_score': virality_score
             })
 
-        # Сортируем по убыванию виральности
         scored_videos.sort(key=lambda x: x['virality_score'], reverse=True)
 
         return [item['video'] for item in scored_videos[:max_results]]
@@ -183,11 +149,7 @@ def search_viral_videos(youtube, region_code, max_results=25, time_period='week'
         print(f"Ошибка при поиске вирусных видео: {e}")
         return []
 
-
 def get_channel_info(youtube, channel_id):
-    """
-    Получение информации о канале
-    """
     try:
         channel_response = youtube.channels().list(
             id=channel_id,
@@ -211,11 +173,7 @@ def get_channel_info(youtube, channel_id):
         print(f"Ошибка при получении информации о канале: {e}")
         return None
 
-
 def get_video_categories(youtube, region_code):
-    """
-    Получение списка категорий видео для региона
-    """
     try:
         categories_response = youtube.videoCategories().list(
             part='snippet',
@@ -235,20 +193,13 @@ def get_video_categories(youtube, region_code):
         print(f"Ошибка при получении категорий: {e}")
         return []
 
-
 def main(search_type='trending', region='US', max_results=20, time_period='week'):
-    """
-    Основная функция для поиска вирусных видео
-    """
-
-    # Инициализация YouTube API
     youtube = get_youtube_service()
     if not youtube:
         return "YOUTUBE INIT ERROR"
 
     print(f"Поиск вирусных видео для региона: {region}, тип: {search_type}")
 
-    # Получение видео в зависимости от типа поиска
     if search_type == 'trending':
         videos = get_trending_videos(youtube, region, max_results)
     elif search_type == 'viral':
@@ -259,7 +210,6 @@ def main(search_type='trending', region='US', max_results=20, time_period='week'
     if not videos:
         return f"Видео не найдены для региона {region}. Попробуйте другой регион или тип поиска."
 
-    # Обработка и структурирование данных
     viral_videos_data = []
 
     for video in videos:
@@ -267,13 +217,11 @@ def main(search_type='trending', region='US', max_results=20, time_period='week'
         video_stats = video['statistics']
         channel_id = video_snippet['channelId']
 
-        # Получаем информацию о канале
         channel_info = get_channel_info(youtube, channel_id)
 
         if not channel_info:
             continue
 
-        # Расчет показателя виральности
         stats_dict = {
             'views': int(video_stats.get('viewCount', 0)),
             'likes': int(video_stats.get('likeCount', 0)),
@@ -282,7 +230,6 @@ def main(search_type='trending', region='US', max_results=20, time_period='week'
 
         virality_score = calculate_virality_score(stats_dict, video_snippet['publishedAt'])
 
-        # Формируем структуру данных
         video_data = {
             'video_info': {
                 'title': video_snippet['title'],
@@ -299,16 +246,11 @@ def main(search_type='trending', region='US', max_results=20, time_period='week'
 
         viral_videos_data.append(video_data)
 
-    # Сортируем по показателю виральности
     viral_videos_data.sort(key=lambda x: x['video_info']['virality_score'], reverse=True)
 
     return viral_videos_data[:max_results]
 
-
-# Пример использования
 if __name__ == "__main__":
-    # Тестируем разные регионы и методы
-
     regions_to_test = ['US', 'RU', 'BR', 'IN', 'JP', 'KR', 'DE', 'FR', 'GB']
 
     for region in regions_to_test:
@@ -316,7 +258,6 @@ if __name__ == "__main__":
         print(f"ТЕСТИРУЕМ РЕГИОН: {region}")
         print(f"{'=' * 60}")
 
-        # Пробуем трендовые видео
         print(f"\n--- ТРЕНДОВЫЕ ВИДЕО В {region} ---")
         result = main(search_type='trending', region=region, max_results=5)
 
@@ -330,7 +271,6 @@ if __name__ == "__main__":
         else:
             print(f"❌ Тренды не доступны: {result}")
 
-        # Пробуем поиск вирусных видео
         print(f"\n--- ВИРУСНЫЕ ВИДЕО В {region} (за неделю) ---")
         result = main(search_type='viral', region=region, max_results=5, time_period='week')
 

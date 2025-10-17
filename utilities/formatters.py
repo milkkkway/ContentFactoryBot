@@ -2,11 +2,10 @@ from typing import Dict, Any
 from datetime import datetime
 
 def format_number(num: int) -> str:
-    """Форматирует числа с разделителями"""
+
     return f"{num:,}".replace(",", " ")
 
 def format_channel_message(channel: Dict[str, Any]) -> str:
-    """Форматирует сообщение с информацией о канале"""
     message = (
         f"🎬 <b>{channel['channel_title']}</b>\n"
         f"👥 <b>Подписчики:</b> {format_number(channel['subscribers'])}\n"
@@ -17,7 +16,6 @@ def format_channel_message(channel: Dict[str, Any]) -> str:
     return message
 
 def format_video_message(video: Dict[str, Any]) -> str:
-    """Форматирует сообщение с информацией о видео"""
     published_date = datetime.fromisoformat(video['published_at'].replace('Z', '+00:00'))
     formatted_date = published_date.strftime("%d.%m.%Y %H:%M")
 

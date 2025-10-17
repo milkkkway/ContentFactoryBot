@@ -2,7 +2,7 @@ from aiogram import Dispatcher, F
 from aiogram.types import Message
 
 async def show_settings(message: Message):
-    """Показывает настройки"""
+
     settings_text = (
         "⚙️ <b>Настройки</b>\n\n"
         "Доступные опции:\n"
@@ -14,7 +14,7 @@ async def show_settings(message: Message):
     await message.answer(settings_text, parse_mode='HTML')
 
 async def show_help(message: Message):
-    """Показывает справку"""
+
     help_text = (
         "🤖 <b>YouTube Analytics Bot - Помощь</b>\n\n"
         "📊 <b>Функциональность:</b>\n"
@@ -34,8 +34,6 @@ async def show_help(message: Message):
     await message.answer(help_text, parse_mode='HTML')
 
 def register_handlers(dp: Dispatcher):
-    """Регистрирует обработчики из этого модуля"""
-    # ТОЛЬКО специфичные обработчики с фильтрами
+
     dp.message.register(show_settings, F.text == "⚙️ Настройки")
     dp.message.register(show_help, F.text == "ℹ️ Помощь")
-    # НЕ регистрируем handle_other_messages здесь!

@@ -6,7 +6,7 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 import api.YouTubeApi as YouTubeApi
-from utilities.states import StatsStates  # Используем обновленные состояния
+from utilities.states import StatsStates
 from utilities.keyboards import (
     create_region_keyboard,
     create_channel_navigation_keyboard
@@ -15,13 +15,10 @@ from utilities.formatters import format_number, format_channel_message, format_v
 
 logger = logging.getLogger(__name__)
 
-# Хранилище для временных данных пользователей
 user_data_store: Dict[int, Dict[str, Any]] = {}
 
-# ========== СТАТИСТИКА ==========
 
 async def start_statistics(message: Message, state: FSMContext):
-    """Начало процесса сбора статистики"""
     await message.answer(
         "🔍 <b>Введите ключевые слова для поиска каналов:</b>\n\n"
         "<i>Пример: технологические обзоры, программирование, гейминг</i>",
@@ -30,7 +27,7 @@ async def start_statistics(message: Message, state: FSMContext):
     await state.set_state(StatsStates.waiting_keyword)
 
 async def process_keyword(message: Message, state: FSMContext):
-    """Обработка ключевых слов"""
+
     keyword = message.text.strip()
 
     if len(keyword) < 2:
@@ -46,7 +43,7 @@ async def process_keyword(message: Message, state: FSMContext):
     await state.set_state(StatsStates.waiting_region)
 
 async def process_region(callback: CallbackQuery, state: FSMContext):
-    """Обработка выбора региона"""
+
     region = callback.data.split("_")[1]
     await state.update_data(region=region)
 
@@ -61,7 +58,7 @@ async def process_region(callback: CallbackQuery, state: FSMContext):
     await state.set_state(StatsStates.waiting_num_posts)
 
 async def process_num_posts(message: Message, state: FSMContext):
-    """Обработка количества постов"""
+
     try:
         num_posts = int(message.text)
         if num_posts < 1 or num_posts > 50:
@@ -80,7 +77,7 @@ async def process_num_posts(message: Message, state: FSMContext):
     await state.set_state(StatsStates.waiting_min_subs)
 
 async def process_min_subs(message: Message, state: FSMContext):
-    """Обработка минимального количества подписчиков"""
+
     try:
         min_subs = int(message.text)
         if min_subs < 0:
@@ -99,7 +96,7 @@ async def process_min_subs(message: Message, state: FSMContext):
     await state.set_state(StatsStates.waiting_min_vids)
 
 async def process_min_vids(message: Message, state: FSMContext):
-    """Обработка минимального количества видео и запуск анализа"""
+
     try:
         min_vids = int(message.text)
         if min_vids < 0:
@@ -109,11 +106,11 @@ async def process_min_vids(message: Message, state: FSMContext):
         await message.answer("❌ <b>Пожалуйста, введите целое число:</b>", parse_mode='HTML')
         return
 
-    # Сохраняем все данные
+
     user_data = await state.get_data()
     await state.update_data(min_vids=min_vids)
 
-    # Показываем сводку параметров
+
     summary_text = (
         "✅ <b>Параметры анализа:</b>\n\n"
         f"🔍 <b>Ключевые слова:</b> {user_data['keyword']}\n"
@@ -127,7 +124,7 @@ async def process_min_vids(message: Message, state: FSMContext):
     progress_msg = await message.answer(summary_text, parse_mode='HTML')
 
     try:
-        # Запускаем анализ
+
         results = YouTubeApi.main(
             search_query=user_data['keyword'],
             region=user_data['region'],
@@ -136,7 +133,7 @@ async def process_min_vids(message: Message, state: FSMContext):
             min_videos=min_vids
         )
 
-        # Сохраняем результаты во временное хранилище
+
         user_data_store[message.from_user.id] = {
             'channels': results,
             'current_channel_index': 0
@@ -159,7 +156,7 @@ async def process_min_vids(message: Message, state: FSMContext):
             await state.clear()
             return
 
-        # Показываем первый канал
+
         await show_channel(message.from_user.id, progress_msg, state)
 
     except Exception as e:
@@ -172,7 +169,7 @@ async def process_min_vids(message: Message, state: FSMContext):
         await state.clear()
 
 async def show_channel(user_id: int, message: Message, state: FSMContext):
-    """Показывает информацию о канале"""
+
     user_data = user_data_store.get(user_id)
     if not user_data or not user_data['channels']:
         await message.edit_text("❌ Данные не найдены")
@@ -193,7 +190,7 @@ async def show_channel(user_id: int, message: Message, state: FSMContext):
     channel = channels[current_index]
     channel_text = format_channel_message(channel)
 
-    # Добавляем номер канала и общее количество
+
     channel_text = (
         f"📊 <b>Канал {current_index + 1} из {len(channels)}</b>\n\n"
         f"{channel_text}"
@@ -208,7 +205,7 @@ async def show_channel(user_id: int, message: Message, state: FSMContext):
     await state.set_state(StatsStates.showing_results)
 
 async def show_next_channel(callback: CallbackQuery, state: FSMContext):
-    """Показывает следующий канал"""
+
     user_id = callback.from_user.id
     user_data = user_data_store.get(user_id)
 
@@ -223,15 +220,13 @@ async def show_next_channel(callback: CallbackQuery, state: FSMContext):
         await callback.answer("Это последний канал")
         return
 
-    # Обновляем индекс
+
     user_data_store[user_id]['current_channel_index'] = current_index + 1
 
-    # Показываем следующий канал
     await show_channel(user_id, callback.message, state)
     await callback.answer()
 
 async def show_prev_channel(callback: CallbackQuery, state: FSMContext):
-    """Показывает предыдущий канал"""
     user_id = callback.from_user.id
     user_data = user_data_store.get(user_id)
 
@@ -245,15 +240,12 @@ async def show_prev_channel(callback: CallbackQuery, state: FSMContext):
         await callback.answer("Это первый канал")
         return
 
-    # Обновляем индекс
     user_data_store[user_id]['current_channel_index'] = current_index - 1
 
-    # Показываем предыдущий канал
     await show_channel(user_id, callback.message, state)
     await callback.answer()
 
 async def show_channel_details(callback: CallbackQuery, state: FSMContext):
-    """Показывает детальную информацию о видео канала"""
     channel_index = int(callback.data.split("_")[2])
     user_id = callback.from_user.id
 
@@ -267,7 +259,7 @@ async def show_channel_details(callback: CallbackQuery, state: FSMContext):
         await callback.answer("Канал не найден")
         return
 
-    # Обновляем текущий индекс канала
+
     user_data_store[user_id]['current_channel_index'] = channel_index
 
     channel = channels[channel_index]
@@ -280,7 +272,7 @@ async def show_channel_details(callback: CallbackQuery, state: FSMContext):
         )
         return
 
-    # Отправляем первое видео
+
     video = videos[0]
     video_text = (
         f"🎬 <b>{channel['channel_title']}</b>\n"
@@ -288,11 +280,9 @@ async def show_channel_details(callback: CallbackQuery, state: FSMContext):
         f"{format_video_message(video)}"
     )
 
-    # Сохраняем индекс текущего видео
     user_data_store[user_id]['current_video_index'] = 0
     user_data_store[user_id]['current_channel_details'] = channel_index
 
-    # Создаем клавиатуру для навигации по видео
     builder = InlineKeyboardBuilder()
     if len(videos) > 1:
         builder.row(InlineKeyboardButton(
@@ -314,7 +304,6 @@ async def show_channel_details(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 async def show_next_video(callback: CallbackQuery):
-    """Показывает следующее видео канала"""
     user_id = callback.from_user.id
     user_data = user_data_store.get(user_id)
 
@@ -335,7 +324,6 @@ async def show_next_video(callback: CallbackQuery):
         await callback.answer("Это последнее видео")
         return
 
-    # Обновляем индекс
     user_data_store[user_id]['current_video_index'] = current_video_index
 
     video = videos[current_video_index]
@@ -345,7 +333,6 @@ async def show_next_video(callback: CallbackQuery):
         f"{format_video_message(video)}"
     )
 
-    # Создаем клавиатуру для навигации
     builder = InlineKeyboardBuilder()
 
     if current_video_index > 0:
@@ -368,7 +355,6 @@ async def show_next_video(callback: CallbackQuery):
     await callback.answer()
 
 async def show_prev_video(callback: CallbackQuery):
-    """Показывает предыдущее видео канала"""
     user_id = callback.from_user.id
     user_data = user_data_store.get(user_id)
 
@@ -387,7 +373,6 @@ async def show_prev_video(callback: CallbackQuery):
         await callback.answer("Это первое видео")
         return
 
-    # Обновляем индекс
     user_data_store[user_id]['current_video_index'] = current_video_index
 
     channel = user_data['channels'][channel_index]
@@ -400,7 +385,6 @@ async def show_prev_video(callback: CallbackQuery):
         f"{format_video_message(video)}"
     )
 
-    # Создаем клавиатуру для навигации
     builder = InlineKeyboardBuilder()
 
     if current_video_index < len(videos) - 1:
@@ -422,21 +406,15 @@ async def show_prev_video(callback: CallbackQuery):
 
     await callback.answer()
 
-async def trend_search(message: Message):
-    """Обработчик для трендов"""
-    await message.answer(
-        "📈 <b>Функционал трендов в разработке</b>\n\n"
-        "Скоро здесь появится анализ трендов!",
-        parse_mode='HTML'
-    )
+async def trend_search(message: Message, state: FSMContext):
+    from handlers.trends import start_trends
+    await start_trends(message, state)
 
 async def back_to_channels(callback: CallbackQuery, state: FSMContext):
-    """Возвращает к списку каналов"""
     user_id = callback.from_user.id
     user_data = user_data_store.get(user_id)
 
     if user_data:
-        # Показываем текущий канал
         await show_channel(user_id, callback.message, state)
     else:
         await callback.message.edit_text(
@@ -448,16 +426,12 @@ async def back_to_channels(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 def register_statistics_handlers(dp: Dispatcher):
-    """Регистрирует все обработчики статистики"""
-    # Обработчики статистики
     dp.message.register(start_statistics, F.text == "📊 СТАТИСТИКА ПО ПАРАМЕТРАМ")
     dp.message.register(trend_search, F.text == "ТРЕНДЫ")
     dp.message.register(process_keyword, StatsStates.waiting_keyword)
     dp.message.register(process_num_posts, StatsStates.waiting_num_posts)
     dp.message.register(process_min_subs, StatsStates.waiting_min_subs)
     dp.message.register(process_min_vids, StatsStates.waiting_min_vids)
-
-    # Обработчики callback-запросов
     dp.callback_query.register(process_region, F.data.startswith("region_"))
     dp.callback_query.register(show_channel_details, F.data.startswith("channel_details_"))
     dp.callback_query.register(show_next_video, F.data.startswith("next_video_"))

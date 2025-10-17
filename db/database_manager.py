@@ -4,7 +4,6 @@ from typing import Optional, Tuple, Any
 
 logger = logging.getLogger(__name__)
 
-
 class DatabaseManager:
     def __init__(self, dbname="postgres", user="postgres", password="2323420",
                  host="localhost", port="5432"):
@@ -19,13 +18,10 @@ class DatabaseManager:
         self.cursor = None
 
     def connect(self) -> bool:
-        """Установка соединения с базой данных"""
         try:
             self.conn = psycopg2.connect(**self.connection_params)
             self.cursor = self.conn.cursor()
             logger.info("✅ Успешное подключение к базе данных")
-
-            # Инициализируем таблицы
             self._initialize_tables()
             return True
 
@@ -37,9 +33,7 @@ class DatabaseManager:
             return False
 
     def _initialize_tables(self):
-        """Инициализация всех таблиц базы данных"""
         try:
-            # Создаем таблицу пользователей с BIGINT для telegram_id
             create_users_table = """
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -51,7 +45,6 @@ class DatabaseManager:
             );
             """
 
-            # Создаем таблицу черновиков с BIGINT для user_id
             create_drafts_table = """
             CREATE TABLE IF NOT EXISTS drafts (
                 id SERIAL PRIMARY KEY,
@@ -72,9 +65,6 @@ class DatabaseManager:
 
             self.cursor.execute(create_users_table)
             self.cursor.execute(create_drafts_table)
-
-
-
             self.conn.commit()
             logger.info("✅ Все таблицы инициализированы")
 
@@ -82,10 +72,7 @@ class DatabaseManager:
             logger.error(f"❌ Ошибка инициализации таблиц: {e}")
             self.conn.rollback()
 
-
-
     def execute_query(self, query: str, params: Tuple = None) -> Optional[Any]:
-        """Выполнение SQL запроса"""
         if not self._check_connection():
             return None
 
@@ -101,7 +88,6 @@ class DatabaseManager:
             return None
 
     def fetch_one(self, query: str, params: Tuple = None) -> Optional[Tuple]:
-        """Получение одной записи"""
         if not self._check_connection():
             return None
 
@@ -113,7 +99,6 @@ class DatabaseManager:
             return None
 
     def fetch_all(self, query: str, params: Tuple = None) -> Optional[list]:
-        """Получение всех записей"""
         if not self._check_connection():
             return None
 
@@ -125,14 +110,12 @@ class DatabaseManager:
             return None
 
     def _check_connection(self) -> bool:
-        """Проверка активного соединения"""
         if self.conn is None or self.cursor is None:
             logger.error("❌ Нет активного соединения с базой данных")
             return False
         return True
 
     def close_connection(self):
-        """Закрытие соединения с базой данных"""
         if self.cursor:
             self.cursor.close()
         if self.conn:

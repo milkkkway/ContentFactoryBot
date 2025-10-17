@@ -109,18 +109,14 @@ def get_channel_videos(youtube, channel_id, max_videos):
 
 
 def main(search_query, region, num_posts, min_subscribers, min_videos):
-    # search_query - key_word
-    # region - location
-    # num_posts - amount a searching posts
 
 
-    # INIT
     youtube = get_youtube_service()
     if not youtube:
         print(API_KEY,VERSION,SERVICE_NAME)
         return ("YOUTUBE INIT ERROR")
 
-    # SEARCHING CHANNELS
+
     found_channels = search_channels(youtube, query=search_query, region_code=region, max_results=25)
     if not found_channels:
         return ("CHANNELS DIDNT FOUND")
@@ -129,7 +125,7 @@ def main(search_query, region, num_posts, min_subscribers, min_videos):
 
     competitors = []
 
-    # BY FILTER
+
     for channel in found_channels:
         channel_id = channel['id']['channelId']
         stats = get_channel_stats(youtube, channel_id)
@@ -146,7 +142,7 @@ def main(search_query, region, num_posts, min_subscribers, min_videos):
         return []
 
 
-    # RECIEVE DATA ABOUT VIDEO
+
     all_competitor_data = []
 
     for competitor in competitors:

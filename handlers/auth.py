@@ -10,9 +10,7 @@ from db.user_manager import UserManager
 logger = logging.getLogger(__name__)
 user_manager = UserManager()
 
-
 async def start_login(message: Message, state: FSMContext):
-    """Начало процесса входа"""
     await message.answer(
         "🔐 <b>Вход в систему</b>\n\n"
         "Введите ваш логин:",
@@ -21,9 +19,7 @@ async def start_login(message: Message, state: FSMContext):
     )
     await state.set_state(AuthStates.waiting_username)
 
-
 async def process_username(message: Message, state: FSMContext):
-    """Обработка введенного логина"""
     username = message.text.strip()
 
     if len(username) < 3:
@@ -42,9 +38,7 @@ async def process_username(message: Message, state: FSMContext):
     )
     await state.set_state(AuthStates.waiting_password)
 
-
 async def process_password(message: Message, state: FSMContext):
-    """Обработка введенного пароля и авторизация"""
     password = message.text.strip()
     user_data = await state.get_data()
     username = user_data['username']
@@ -59,13 +53,10 @@ async def process_password(message: Message, state: FSMContext):
         return
 
     try:
-        # Проверяем существование пользователя
         if user_manager.check_user_exists(username=username, psswrd=password):
-            # Получаем данные пользователя
             user_db_data = user_manager.get_user_by_username(username)
 
             if user_db_data and not user_db_data.get('telegram_id'):
-                # Обновляем пользователя, добавляя telegram_id
                 user_manager.update_user_telegram_id(username, telegram_id)
                 logger.info(f"✅ Telegram ID {telegram_id} добавлен для пользователя {username}")
 
@@ -93,9 +84,7 @@ async def process_password(message: Message, state: FSMContext):
         user_manager.close_connection()
         await state.clear()
 
-
 async def start_register(message: Message, state: FSMContext):
-    """Начало процесса регистрации"""
     await message.answer(
         "📝 <b>Регистрация нового пользователя</b>\n\n"
         "Придумайте и введите ваш логин:",
@@ -104,9 +93,7 @@ async def start_register(message: Message, state: FSMContext):
     )
     await state.set_state(AuthStates.waiting_new_username)
 
-
 async def process_new_username(message: Message, state: FSMContext):
-    """Обработка нового логина"""
     username = message.text.strip()
 
     if len(username) < 3:
@@ -126,7 +113,6 @@ async def process_new_username(message: Message, state: FSMContext):
         return
 
     try:
-        # Проверяем, не занят ли логин
         if user_manager.check_user_exists(username=username):
             await message.answer(
                 "❌ Пользователь с таким логином уже существует.\n"
@@ -153,9 +139,7 @@ async def process_new_username(message: Message, state: FSMContext):
     finally:
         user_manager.close_connection()
 
-
 async def process_new_password(message: Message, state: FSMContext):
-    """Обработка нового пароля и создание пользователя"""
     password = message.text.strip()
     user_data = await state.get_data()
     username = user_data['username']
@@ -178,7 +162,6 @@ async def process_new_password(message: Message, state: FSMContext):
         return
 
     try:
-        # Создаем пользователя с telegram_id
         if user_manager.create_user(
                 username=username,
                 psswrd=password,
@@ -208,9 +191,7 @@ async def process_new_password(message: Message, state: FSMContext):
         user_manager.close_connection()
         await state.clear()
 
-
 async def cancel_auth(callback: CallbackQuery, state: FSMContext):
-    """Отмена процесса авторизации/регистрации"""
     await callback.message.answer(
         "❌ Авторизация отменена.",
         reply_markup=create_login_keyboard()
@@ -218,18 +199,11 @@ async def cancel_auth(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.answer()
 
-
 def register_auth_handlers(dp: Dispatcher):
-    """Регистрирует обработчики авторизации"""
-    # Обработчики для кнопок входа и регистрации
     dp.message.register(start_login, F.text == "Войти")
     dp.message.register(start_register, F.text == "Создать пользователя")
-
-    # Обработчики состояний авторизации
     dp.message.register(process_username, AuthStates.waiting_username)
     dp.message.register(process_password, AuthStates.waiting_password)
     dp.message.register(process_new_username, AuthStates.waiting_new_username)
     dp.message.register(process_new_password, AuthStates.waiting_new_password)
-
-    # Обработчики callback-запросов
     dp.callback_query.register(cancel_auth, F.data == "cancel_auth")

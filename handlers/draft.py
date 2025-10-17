@@ -15,15 +15,15 @@ from db.draft_manager import DraftManager
 
 logger = logging.getLogger(__name__)
 
-# Хранилище для временных данных черновиков
+
 draft_temp_store: Dict[int, Dict[str, Any]] = {}
 
-# Создаем экземпляр менеджера черновиков
+
 draft_manager = DraftManager()
 
 
 async def start_create_draft(message: Message, state: FSMContext):
-    """Начало создания черновика"""
+
     user_id = message.from_user.id
 
     await message.answer(
@@ -36,7 +36,7 @@ async def start_create_draft(message: Message, state: FSMContext):
 
 
 async def process_media(message: Message, state: FSMContext):
-    """Обработка загруженного медиа"""
+
     user_id = message.from_user.id
     media_file_id = None
     media_type = None
@@ -55,7 +55,7 @@ async def process_media(message: Message, state: FSMContext):
         )
         return
 
-    # Сохраняем медиа во временное хранилище
+
     draft_temp_store[user_id] = {
         'media_file_id': media_file_id,
         'media_type': media_type
@@ -70,7 +70,7 @@ async def process_media(message: Message, state: FSMContext):
 
 
 async def process_title(message: Message, state: FSMContext):
-    """Обработка заголовка"""
+
     user_id = message.from_user.id
     title = message.text.strip()
 
@@ -90,7 +90,7 @@ async def process_title(message: Message, state: FSMContext):
         )
         return
 
-    # Сохраняем заголовок
+
     if user_id not in draft_temp_store:
         draft_temp_store[user_id] = {}
     draft_temp_store[user_id]['title'] = title
@@ -105,14 +105,14 @@ async def process_title(message: Message, state: FSMContext):
 
 
 async def process_description(message: Message, state: FSMContext):
-    """Обработка описания и сохранение черновика"""
+
     user_id = message.from_user.id
     description = message.text.strip()
 
     if description == '-':
         description = ""
 
-    # Получаем данные из временного хранилища
+
     draft_data = draft_temp_store.get(user_id)
     if not draft_data:
         await message.answer(
@@ -122,7 +122,7 @@ async def process_description(message: Message, state: FSMContext):
         await state.clear()
         return
 
-    # Сохраняем черновик в базу данных
+
     if not draft_manager.connect():
         await message.answer(
             "❌ Ошибка подключения к базе данных. Попробуйте позже.",
@@ -132,9 +132,9 @@ async def process_description(message: Message, state: FSMContext):
         return
 
     try:
-        # Создаем черновик с Telegram ID пользователя
+
         draft = draft_manager.create_draft(
-            user_id=user_id,  # Используем Telegram ID напрямую
+            user_id=user_id,
             username=message.from_user.username or f"user_{user_id}",
             title=draft_data['title'],
             description=description,
@@ -143,7 +143,7 @@ async def process_description(message: Message, state: FSMContext):
         )
 
         if draft:
-            # Очищаем временное хранилище
+
             if user_id in draft_temp_store:
                 del draft_temp_store[user_id]
 
@@ -174,7 +174,7 @@ async def process_description(message: Message, state: FSMContext):
 
 
 async def show_my_drafts(message: Message, state: FSMContext):
-    """Показывает список черновиков пользователя по Telegram ID"""
+
     user_id = message.from_user.id
 
     if not draft_manager.connect():
@@ -185,7 +185,7 @@ async def show_my_drafts(message: Message, state: FSMContext):
         return
 
     try:
-        # Получаем черновики по Telegram ID
+
         drafts = draft_manager.get_user_drafts(user_id)
 
         if not drafts:
@@ -216,7 +216,7 @@ async def show_my_drafts(message: Message, state: FSMContext):
 
 
 async def show_draft_details(callback: CallbackQuery, state: FSMContext):
-    """Показывает детальную информацию о черновике"""
+
     user_id = callback.from_user.id
     draft_id = int(callback.data.split("_")[2])
 
@@ -229,7 +229,7 @@ async def show_draft_details(callback: CallbackQuery, state: FSMContext):
         return
 
     try:
-        # Получаем черновик по ID и Telegram ID пользователя
+
         draft = draft_manager.get_draft_by_id(draft_id, user_id)
 
         if not draft:
@@ -240,7 +240,7 @@ async def show_draft_details(callback: CallbackQuery, state: FSMContext):
             await callback.answer()
             return
 
-        # Формируем сообщение с информацией о черновике
+
         draft_text = (
             f"📄 <b>Черновик #{draft['id']}</b>\n\n"
             f"📌 <b>Заголовок:</b> {draft['title']}\n"
@@ -250,7 +250,6 @@ async def show_draft_details(callback: CallbackQuery, state: FSMContext):
             f"👤 <b>Автор:</b> {draft['username']}"
         )
 
-        # Отправляем медиа и информацию
         if draft['media_type'] == 'photo':
             await callback.message.answer_photo(
                 photo=draft['media_file_id'],
@@ -279,10 +278,10 @@ async def show_draft_details(callback: CallbackQuery, state: FSMContext):
         draft_manager.close_connection()
 
 
-# ДОБАВЛЕННЫЕ ФУНКЦИИ:
+
 
 async def handle_drafts_pagination(callback: CallbackQuery, state: FSMContext):
-    """Обработка пагинации списка черновиков"""
+
     user_id = callback.from_user.id
     page = int(callback.data.split("_")[2])
 
@@ -304,7 +303,7 @@ async def handle_drafts_pagination(callback: CallbackQuery, state: FSMContext):
 
 
 async def back_to_main_menu(callback: CallbackQuery, state: FSMContext):
-    """Возврат в главное меню"""
+
     await callback.message.answer(
         "🔙 Возвращаемся в главное меню",
         reply_markup=create_main_keyboard()
@@ -314,16 +313,16 @@ async def back_to_main_menu(callback: CallbackQuery, state: FSMContext):
 
 
 async def back_to_drafts_list(callback: CallbackQuery, state: FSMContext):
-    """Возврат к списку черновиков"""
+
     await show_my_drafts(callback.message, state)
     await callback.answer()
 
 
 async def cancel_draft_creation(callback: CallbackQuery, state: FSMContext):
-    """Отмена создания черновика"""
+
     user_id = callback.from_user.id
 
-    # Очищаем временное хранилище
+
     if user_id in draft_temp_store:
         del draft_temp_store[user_id]
 
@@ -336,7 +335,7 @@ async def cancel_draft_creation(callback: CallbackQuery, state: FSMContext):
 
 
 async def delete_draft(callback: CallbackQuery, state: FSMContext):
-    """Удаление черновика"""
+
     user_id = callback.from_user.id
     draft_id = int(callback.data.split("_")[2])
 
@@ -380,17 +379,14 @@ async def delete_draft(callback: CallbackQuery, state: FSMContext):
 
 
 def register_draft_handlers(dp: Dispatcher):
-    """Регистрирует обработчики черновиков"""
-    # Обработчики создания черновика
     dp.message.register(start_create_draft, F.text == "📝 Создать черновик")
     dp.message.register(show_my_drafts, F.text == "📂 Мои черновики")
 
-    # Обработчики состояний черновика
     dp.message.register(process_media, DraftStates.waiting_media)
     dp.message.register(process_title, DraftStates.waiting_title)
     dp.message.register(process_description, DraftStates.waiting_description)
 
-    # Обработчики callback-запросов
+
     dp.callback_query.register(show_draft_details, F.data.startswith("view_draft_"))
     dp.callback_query.register(handle_drafts_pagination, F.data.startswith("drafts_page_"))
     dp.callback_query.register(delete_draft, F.data.startswith("delete_draft_"))

@@ -3,7 +3,6 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 
 def create_login_keyboard() -> ReplyKeyboardMarkup:
-    """Создает клавиатуру для входа"""
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="Войти")],
@@ -15,7 +14,6 @@ def create_login_keyboard() -> ReplyKeyboardMarkup:
 
 
 def create_main_keyboard() -> ReplyKeyboardMarkup:
-    """Создает главную клавиатуру"""
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="📊 СТАТИСТИКА ПО ПАРАМЕТРАМ")],
@@ -29,7 +27,6 @@ def create_main_keyboard() -> ReplyKeyboardMarkup:
 
 
 def create_region_keyboard() -> InlineKeyboardMarkup:
-    """Создает клавиатуру для выбора региона"""
     builder = InlineKeyboardBuilder()
     builder.row(
         InlineKeyboardButton(text="🇷🇺 Россия", callback_data="region_RU"),
@@ -51,10 +48,7 @@ def create_region_keyboard() -> InlineKeyboardMarkup:
 
 
 def create_channel_navigation_keyboard(current_index: int, total_channels: int) -> InlineKeyboardMarkup:
-    """Создает клавиатуру для навигации по каналам"""
     builder = InlineKeyboardBuilder()
-
-    # Кнопки навигации
     buttons = []
     if current_index > 0:
         buttons.append(InlineKeyboardButton(text="⬅️ Предыдущий", callback_data=f"prev_channel_{current_index}"))
@@ -69,16 +63,12 @@ def create_channel_navigation_keyboard(current_index: int, total_channels: int) 
 
 
 def create_channel_details_keyboard(channel_index: int, total_channels: int) -> InlineKeyboardMarkup:
-    """Создает кнопку 'Подробнее' для канала с навигацией"""
     builder = InlineKeyboardBuilder()
-
-    # Основная кнопка
     builder.row(InlineKeyboardButton(
         text="🔍 Подробнее о видео",
         callback_data=f"channel_details_{channel_index}"
     ))
 
-    # Навигация между каналами
     nav_buttons = []
     if channel_index > 0:
         nav_buttons.append(InlineKeyboardButton(text="⬅️ Пред. канал", callback_data=f"prev_channel_{channel_index}"))
@@ -93,7 +83,6 @@ def create_channel_details_keyboard(channel_index: int, total_channels: int) -> 
 
 
 def create_back_to_channels_keyboard() -> InlineKeyboardMarkup:
-    """Создает кнопку 'Назад к каналам'"""
     builder = InlineKeyboardBuilder()
     builder.row(InlineKeyboardButton(
         text="⬅️ Назад к каналам",
@@ -103,7 +92,6 @@ def create_back_to_channels_keyboard() -> InlineKeyboardMarkup:
 
 
 def create_draft_actions_keyboard(draft_id: int) -> InlineKeyboardMarkup:
-    """Создает клавиатуру действий для черновика"""
     builder = InlineKeyboardBuilder()
 
     builder.row(
@@ -118,14 +106,12 @@ def create_draft_actions_keyboard(draft_id: int) -> InlineKeyboardMarkup:
 
 
 def create_drafts_list_keyboard(drafts: list, current_page: int = 0, page_size: int = 5) -> InlineKeyboardMarkup:
-    """Создает клавиатуру для списка черновиков"""
     builder = InlineKeyboardBuilder()
 
     start_idx = current_page * page_size
     end_idx = start_idx + page_size
     current_drafts = drafts[start_idx:end_idx]
 
-    # Кнопки черновиков
     for draft in current_drafts:
         builder.row(
             InlineKeyboardButton(
@@ -134,7 +120,6 @@ def create_drafts_list_keyboard(drafts: list, current_page: int = 0, page_size: 
             )
         )
 
-    # Кнопки навигации
     nav_buttons = []
     if current_page > 0:
         nav_buttons.append(InlineKeyboardButton(text="⬅️ Назад", callback_data=f"drafts_page_{current_page - 1}"))
@@ -150,23 +135,19 @@ def create_drafts_list_keyboard(drafts: list, current_page: int = 0, page_size: 
 
 
 def create_cancel_keyboard() -> InlineKeyboardMarkup:
-    """Создает клавиатуру для отмены действия"""
     builder = InlineKeyboardBuilder()
     builder.row(InlineKeyboardButton(text="❌ Отменить", callback_data="cancel_draft"))
     return builder.as_markup()
 
 
-# ДОБАВЛЕННЫЕ ФУНКЦИИ:
 
 def create_back_keyboard() -> InlineKeyboardMarkup:
-    """Создает клавиатуру для возврата назад (для статистики)"""
     builder = InlineKeyboardBuilder()
     builder.row(InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main"))
     return builder.as_markup()
 
 
 def create_statistics_period_keyboard() -> InlineKeyboardMarkup:
-    """Создает клавиатуру для выбора периода статистики"""
     builder = InlineKeyboardBuilder()
 
     builder.row(
@@ -185,7 +166,76 @@ def create_statistics_period_keyboard() -> InlineKeyboardMarkup:
 
 
 def create_auth_cancel_keyboard() -> InlineKeyboardMarkup:
-    """Создает клавиатуру для отмены авторизации"""
+
     builder = InlineKeyboardBuilder()
     builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_auth"))
+    return builder.as_markup()
+
+
+def create_trends_region_keyboard() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text="🇺🇸 США", callback_data="trends_region_US"),
+        InlineKeyboardButton(text="🇷🇺 Россия", callback_data="trends_region_RU")
+    )
+    builder.row(
+        InlineKeyboardButton(text="🇧🇷 Бразилия", callback_data="trends_region_BR"),
+        InlineKeyboardButton(text="🇮🇳 Индия", callback_data="trends_region_IN")
+    )
+    builder.row(
+        InlineKeyboardButton(text="🇯🇵 Япония", callback_data="trends_region_JP"),
+        InlineKeyboardButton(text="🇰🇷 Корея", callback_data="trends_region_KR")
+    )
+    builder.row(
+        InlineKeyboardButton(text="🇩🇪 Германия", callback_data="trends_region_DE"),
+        InlineKeyboardButton(text="🇫🇷 Франция", callback_data="trends_region_FR")
+    )
+    builder.row(
+        InlineKeyboardButton(text="🇬🇧 Великобритания", callback_data="trends_region_GB")
+    )
+    return builder.as_markup()
+
+
+def create_trends_navigation_keyboard(current_index: int, total_trends: int, region: str) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    nav_buttons = []
+    if current_index > 0:
+        nav_buttons.append(InlineKeyboardButton(text="⬅️ Предыдущий", callback_data=f"prev_trend_{current_index}"))
+
+    nav_buttons.append(InlineKeyboardButton(text="🔍 Подробнее", callback_data=f"trend_details_{current_index}"))
+
+    if current_index < total_trends - 1:
+        nav_buttons.append(InlineKeyboardButton(text="➡️ Следующий", callback_data=f"next_trend_{current_index}"))
+
+    builder.row(*nav_buttons)
+
+    builder.row(InlineKeyboardButton(text="🌍 Сменить регион", callback_data="change_trends_region"))
+
+    builder.row(InlineKeyboardButton(text="🔙 Главное меню", callback_data="back_to_main"))
+
+    return builder.as_markup()
+
+
+def create_trend_details_keyboard(trend_index: int, total_trends: int, region: str,
+                                  video_url: str) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+
+    builder.row(InlineKeyboardButton(text="📺 Смотреть видео", url=video_url))
+
+    nav_buttons = []
+    if trend_index > 0:
+        nav_buttons.append(InlineKeyboardButton(text="⬅️ Пред. тренд", callback_data=f"prev_trend_{trend_index}"))
+
+    nav_buttons.append(InlineKeyboardButton(text="📋 К списку", callback_data="back_to_trends_list"))
+
+    if trend_index < total_trends - 1:
+        nav_buttons.append(InlineKeyboardButton(text="След. тренд ➡️", callback_data=f"next_trend_{trend_index}"))
+
+    builder.row(*nav_buttons)
+
+    builder.row(
+        InlineKeyboardButton(text="🌍 Другой регион", callback_data="change_trends_region"),
+        InlineKeyboardButton(text="🔙 В меню", callback_data="back_to_main")
+    )
+
     return builder.as_markup()
